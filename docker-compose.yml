@@ -1,0 +1,61 @@
+version: "3.8"
+
+services:
+  vulnerable-app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: vulnerable-container
+    ports:
+      - "5005:5000"
+    # Add CAP_SYS_MODULE capability (dangerous!)
+    cap_add:
+      - SYS_MODULE
+    # Do NOT use privileged mode - we want to show escape with just CAP_SYS_MODULE
+    # privileged: false  # This is the default
+
+    # Mount host's kernel modules (required for CAP_SYS_MODULE to work)
+    volumes:
+      - /lib/modules:/lib/modules:ro
+      - /proc:/host/proc:ro
+      - /sys:/host/sys:ro
+
+    # Environment variables for demonstration
+    environment:
+      - FLASK_ENV=development
+      - FLASK_DEBUG=1
+      - CONTAINER_NAME=vulnerable-container
+      - ESCAPE_DEMO=enabled
+
+    # Security context - non-root user but with dangerous capability
+    security_opt:
+      - no-new-privileges:false # Allow privilege escalation (dangerous!)
+
+    # Network configuration
+    networks:
+      - escape-network
+
+    # Resource limits (won't help against kernel-level escapes)
+    deploy:
+      resources:
+        limits:
+          cpus: "1.0"
+          memory: 512M
+        reservations:
+          cpus: "0.5"
+          memory: 256M
+
+    # Labels for identification
+    labels:
+      - "security.vulnerable=true"
+      - "purpose=educational"
+      - "capability=CAP_SYS_MODULE"
+
+    # Keep container running even if app crashes
+    restart: unless-stopped
+
+networks:
+  escape-network:
+    driver: bridge
+    labels:
+      - "security.isolated=false"
