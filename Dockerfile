@@ -11,6 +11,7 @@ RUN apt-get update && apt-get install -y \
     gcc \
     make \
     iputils-ping \
+    netcat \
     linux-headers-generic \
     && rm -rf /var/lib/apt/lists/*
 
