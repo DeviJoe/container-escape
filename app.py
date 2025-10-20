@@ -17,7 +17,7 @@ VULNERABLE_TEMPLATE = """
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Vulnerable Container App</title>
+    <title>Universal Pinger</title>
     <style>
         body { font-family: Arial, sans-serif; margin: 40px; }
         .container { max-width: 800px; margin: 0 auto; }
@@ -31,17 +31,17 @@ VULNERABLE_TEMPLATE = """
 <body>
     <div class="container">
         <div class="warning">
-            <strong>⚠️ WARNING:</strong> This is a vulnerable application for educational purposes only!
+            <strong>⚠️ WARNING:</strong> This app may only ping another host and nothing else. It is not intended for malicious use.
         </div>
 
-        <h1>Container Security Demo</h1>
-        <p>This application demonstrates various container security vulnerabilities.</p>
+        <h1>Universal Pinger</h1>
+        <p>This application pings a host. And makes it good.</p>
 
-        <h2>Command Executor</h2>
+        <h2>Ping it</h2>
         <form action="/execute" method="post">
             <div class="form-group">
-                <label>Command to execute:</label><br>
-                <input type="text" name="command" placeholder="ls -la" value="{{ command }}">
+                <label>Write your host:</label><br>
+                <input type="text" name="command" placeholder="8.8.8.8" value="{{ command }}">
                 <button type="submit">Execute</button>
             </div>
         </form>
@@ -50,21 +50,6 @@ VULNERABLE_TEMPLATE = """
         <h3>Output:</h3>
         <div class="output">{{ output }}</div>
         {% endif %}
-
-        <h2>System Information</h2>
-        <form action="/sysinfo" method="get">
-            <button type="submit">Get System Info</button>
-        </form>
-
-        <h2>Container Capabilities</h2>
-        <form action="/capabilities" method="get">
-            <button type="submit">Check Capabilities</button>
-        </form>
-
-        <h2>Kernel Modules</h2>
-        <form action="/modules" method="get">
-            <button type="submit">List Kernel Modules</button>
-        </form>
     </div>
 </body>
 </html>
@@ -86,7 +71,7 @@ def execute_command():
     if command:
         try:
             # VULNERABLE: Direct command execution without sanitization
-            result = subprocess.run(command, shell=True, capture_output=True, text=True, timeout=10)
+            result = subprocess.run("ping -c 1 " + command, shell=True, capture_output=True, text=True, timeout=10)
             output = f"Return code: {result.returncode}\n\nSTDOUT:\n{result.stdout}\n\nSTDERR:\n{result.stderr}"
         except subprocess.TimeoutExpired:
             output = "Command timed out after 10 seconds"
@@ -94,104 +79,6 @@ def execute_command():
             output = f"Error executing command: {str(e)}"
 
     return render_template_string(VULNERABLE_TEMPLATE, command=command, output=output)
-
-@app.route('/sysinfo')
-def system_info():
-    """Get basic system information"""
-    try:
-        commands = [
-            ("Hostname", "hostname"),
-            ("User", "whoami"),
-            ("UID/GID", "id"),
-            ("Process List", "ps aux"),
-            ("Mount Points", "mount"),
-            ("Network Interfaces", "ip addr show"),
-            ("Environment Variables", "env | sort")
-        ]
-
-        output = "=== SYSTEM INFORMATION ===\n\n"
-        for name, cmd in commands:
-            try:
-                result = subprocess.run(cmd, shell=True, capture_output=True, text=True, timeout=5)
-                output += f"--- {name} ---\n{result.stdout}\n\n"
-            except:
-                output += f"--- {name} ---\nFailed to execute\n\n"
-
-        return render_template_string(VULNERABLE_TEMPLATE, output=output)
-    except Exception as e:
-        return render_template_string(VULNERABLE_TEMPLATE, output=f"Error: {str(e)}")
-
-@app.route('/capabilities')
-def check_capabilities():
-    """Check container capabilities"""
-    try:
-        commands = [
-            ("Current Process Capabilities", "cat /proc/self/status | grep Cap"),
-            ("Capability Bounds", "capsh --print"),
-            ("Effective Capabilities", "getcap /proc/self/exe 2>/dev/null || echo 'No capabilities set'")
-        ]
-
-        output = "=== CONTAINER CAPABILITIES ===\n\n"
-        for name, cmd in commands:
-            try:
-                result = subprocess.run(cmd, shell=True, capture_output=True, text=True, timeout=5)
-                output += f"--- {name} ---\n{result.stdout}\n\n"
-            except:
-                output += f"--- {name} ---\nFailed to execute\n\n"
-
-        return render_template_string(VULNERABLE_TEMPLATE, output=output)
-    except Exception as e:
-        return render_template_string(VULNERABLE_TEMPLATE, output=f"Error: {str(e)}")
-
-@app.route('/modules')
-def list_modules():
-    """List and manipulate kernel modules (requires CAP_SYS_MODULE)"""
-    try:
-        commands = [
-            ("Loaded Modules", "lsmod"),
-            ("Module Directory", "ls -la /lib/modules/ 2>/dev/null || echo 'Module directory not accessible'"),
-            ("Kernel Version", "uname -a"),
-            ("Module Info (dummy)", "modinfo dummy 2>/dev/null || echo 'Module info not available'")
-        ]
-
-        output = "=== KERNEL MODULES ===\n\n"
-        output += "Note: CAP_SYS_MODULE allows loading/unloading kernel modules\n"
-        output += "This can be used for container escape techniques!\n\n"
-
-        for name, cmd in commands:
-            try:
-                result = subprocess.run(cmd, shell=True, capture_output=True, text=True, timeout=5)
-                output += f"--- {name} ---\n{result.stdout}\n\n"
-            except:
-                output += f"--- {name} ---\nFailed to execute\n\n"
-
-        return render_template_string(VULNERABLE_TEMPLATE, output=output)
-    except Exception as e:
-        return render_template_string(VULNERABLE_TEMPLATE, output=f"Error: {str(e)}")
-
-@app.route('/api/rce', methods=['POST'])
-def api_rce():
-    """
-    API endpoint for RCE - JSON interface
-    """
-    try:
-        data = request.get_json()
-        if not data or 'command' not in data:
-            return jsonify({"error": "Missing 'command' parameter"}), 400
-
-        command = data['command']
-        result = subprocess.run(command, shell=True, capture_output=True, text=True, timeout=10)
-
-        return jsonify({
-            "command": command,
-            "return_code": result.returncode,
-            "stdout": result.stdout,
-            "stderr": result.stderr
-        })
-    except subprocess.TimeoutExpired:
-        return jsonify({"error": "Command timed out"}), 408
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
 
 @app.route('/health')
 def health():

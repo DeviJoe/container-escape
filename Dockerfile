@@ -10,6 +10,7 @@ RUN apt-get update && apt-get install -y \
     libcap2-bin \
     gcc \
     make \
+    iputils-ping \
     linux-headers-generic \
     && rm -rf /var/lib/apt/lists/*
 
